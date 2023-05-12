@@ -1,70 +1,254 @@
-# Getting Started with Create React App
+# AWS-Amplify-Masterclass
+Fullstack App development using AWS Amplify
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### Prequisites
 
-## Available Scripts
+```
+Node.js v14.x or later : https://nodejs.org/en
+npm v6.14.4 or later : https://www.npmjs.com/
+git v2.14.1 or later : https://git-scm.com/
 
-In the project directory, you can run:
+AWS Account : https://aws.amazon.com/
 
-### `npm start`
+Amplify Cli : https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
 
-### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+#### Configure Amplify
 
-### `npm run build`
+```
+amplify configure
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+#### Setup Reactjs project
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```
+npx create-react-app react-amplified
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+cd react-amplified
 
-### `npm run eject`
+npm start
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+#### Initialize Amplify project
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+amplify init
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+#### Add API Backend 
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
-## Learn More
+```
+amplify add api
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+amplify push
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+amplify status
 
-### Code Splitting
+amplify console api
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+amplify mock api
+```
 
-### Analyzing the Bundle Size
+Try running a couple of mutations locally and then querying for the todos:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```
+mutation createTodo {
+  createTodo(input: {
+    name: "Build an API"
+    description: "Build a serverless API with Amplify and GraphQL"
+  }) {
+    id
+    name
+    description
+  }
+}
 
-### Making a Progressive Web App
+query listTodos {
+  listTodos {
+    items {
+      id
+      description
+      name
+    }
+  }
+}
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+```
 
-### Advanced Configuration
+#### Install Amplify packages
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+```
+npm install aws-amplify
+```
+Open src/index.js and add the following code below the last import:
 
-### Deployment
+```
+import { Amplify } from 'aws-amplify';
+import awsExports from './aws-exports';
+Amplify.configure(awsExports);
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+#### Frontend Integration
 
-### `npm run build` fails to minify
+`src/App.js` and replace it with the following code:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```
+/* src/App.js */
+import React, { useEffect, useState } from 'react'
+import { Amplify, API, graphqlOperation } from 'aws-amplify'
+import { createTodo } from './graphql/mutations'
+import { listTodos } from './graphql/queries'
+
+import awsExports from "./aws-exports";
+Amplify.configure(awsExports);
+
+const initialState = { name: '', description: '' }
+
+const App = () => {
+  const [formState, setFormState] = useState(initialState)
+  const [todos, setTodos] = useState([])
+
+  useEffect(() => {
+    fetchTodos()
+  }, [])
+
+  function setInput(key, value) {
+    setFormState({ ...formState, [key]: value })
+  }
+
+  async function fetchTodos() {
+    try {
+      const todoData = await API.graphql(graphqlOperation(listTodos))
+      const todos = todoData.data.listTodos.items
+      setTodos(todos)
+    } catch (err) { console.log('error fetching todos') }
+  }
+
+  async function addTodo() {
+    try {
+      if (!formState.name || !formState.description) return
+      const todo = { ...formState }
+      setTodos([...todos, todo])
+      setFormState(initialState)
+      await API.graphql(graphqlOperation(createTodo, {input: todo}))
+    } catch (err) {
+      console.log('error creating todo:', err)
+    }
+  }
+
+  return (
+    <div style={styles.container}>
+      <h2>Amplify Todos</h2>
+      <input
+        onChange={event => setInput('name', event.target.value)}
+        style={styles.input}
+        value={formState.name}
+        placeholder="Name"
+      />
+      <input
+        onChange={event => setInput('description', event.target.value)}
+        style={styles.input}
+        value={formState.description}
+        placeholder="Description"
+      />
+      <button style={styles.button} onClick={addTodo}>Create Todo</button>
+      {
+        todos.map((todo, index) => (
+          <div key={todo.id ? todo.id : index} style={styles.todo}>
+            <p style={styles.todoName}>{todo.name}</p>
+            <p style={styles.todoDescription}>{todo.description}</p>
+          </div>
+        ))
+      }
+    </div>
+  )
+}
+
+const styles = {
+  container: { width: 400, margin: '0 auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: 20 },
+  todo: {  marginBottom: 15 },
+  input: { border: 'none', backgroundColor: '#ddd', marginBottom: 10, padding: 8, fontSize: 18 },
+  todoName: { fontSize: 20, fontWeight: 'bold' },
+  todoDescription: { marginBottom: 0 },
+  button: { backgroundColor: 'black', color: 'white', outline: 'none', fontSize: 18, padding: '12px 0px' }
+}
+
+export default App
+```
+
+#### Run the application
+
+```
+npm start
+
+```
+
+#### Add Authentication module
+
+```
+amplify add auth
+
+amplify push
+
+```
+
+#### Configure login UI
+
+```
+npm install @aws-amplify/ui-react
+
+```
+
+Open src/App.js and make the following changes:
+
+```
+import { withAuthenticator, Button, Heading } from '@aws-amplify/ui-react';
+import '@aws-amplify/ui-react/styles.css';
+
+```
+
+```
+/* src/App.js */
+function App({ signOut, user }) { 
+  // ... 
+}
+
+
+// ...
+return (
+  <div style={styles.container}>
+    <Heading level={1}>Hello {user.username}</Heading>
+    <Button onClick={signOut}>Sign out</Button>
+    <h2>Amplify Todos</h2>
+//...
+
+export default withAuthenticator(App);
+
+```
+
+```
+npm start
+
+```
+
+#### Deploy and Host the app
+
+```
+amplify add hosting
+```
+
+```
+Select the plugin module to execute: Hosting with Amplify Console (Managed hosting with custom domains, Continuous deployment)
+Choose a type: Manual Deployment
+
+```
+
+```
+amplify publish
+```
